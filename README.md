@@ -34,9 +34,30 @@ For more control, set things up by hand:
 /ww point add          # turn the block you're looking at (or standing on) into a control point
 /ww point auto 3 50    # or: replace all points with 3 placed 50 blocks around you
 /ww spawn set red      # red's spawn = where you're standing
-/ww spawn auto 120     # or: spawns for every team with players, 120 blocks out from the points
+/ww spawn auto         # or: spawns for every team with players, spread around the points
 /ww start
 ```
+
+### Picking interesting spots
+
+`/ww point find` adds a point that matches some filters, searching from where you stand:
+
+```
+/ww point find high                          # highest ground nearby
+/ww point find low                           # deepest cave floor nearby
+/ww point find structure:village             # inside the nearest village (any variant)
+/ww point find structure:ancient_city
+/ww point find biome:cherry_grove
+/ww point find biome:jagged_peaks high       # top of the nearest jagged peaks
+/ww point find biome:deep_dark               # cave biomes work too
+/ww point find low range:200                 # search a wider area
+```
+
+Tab completion lists every biome and structure. Repeated searches skip spots near existing points. Use `/ww point tp <n>` to go look, and `/ww point remove <n>` if you don't like it. Big searches can freeze the server for a few seconds.
+
+### Spawn distance
+
+By default `/ww spawn auto` (and quicklaunch) puts spawns far enough out that running to the point takes about a quarter of the timer, assuming ~4 blocks/second over real terrain. That's 600 blocks with a 10 minute timer, 60 with a 1 minute timer. Override it with `/ww spawn auto <blocks>`, or `/ww config auto.spawn-radius <blocks>` (set it back to `auto` to restore), and tune `auto.spawn-travel-fraction` / `auto.run-speed`.
 
 ## Commands
 
@@ -53,7 +74,8 @@ Admins (op):
 | Command | |
 |---|---|
 | `/ww quicklaunch` | Auto-place anything missing, count down, teleport, start |
-| `/ww point add \| remove <n> \| list \| clear \| auto [count] [spread]` | Control points (any dimension) |
+| `/ww point add \| remove <n> \| list \| clear \| tp <n> \| auto [count] [spread]` | Control points (any dimension) |
+| `/ww point find [high\|low] [biome:<id>] [structure:<id>] [range:<blocks>]` | Add a point somewhere specific |
 | `/ww spawn set [color] \| clear [color] \| list \| auto [radius]` | Team spawns |
 | `/ww start` · `stop` · `end` · `pause` · `resume` | `start` resets scores; `end` declares the leader the winner |
 | `/ww timer <minutes> \| reset` | Length of a full rotation |

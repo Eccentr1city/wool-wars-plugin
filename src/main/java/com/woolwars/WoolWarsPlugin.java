@@ -4,6 +4,7 @@ import com.woolwars.commands.WoolWarsCommand;
 import com.woolwars.game.Game;
 import com.woolwars.game.Hud;
 import com.woolwars.game.Placement;
+import com.woolwars.game.PointFinder;
 import com.woolwars.game.Supplies;
 import com.woolwars.game.Teams;
 import com.woolwars.game.Visuals;
@@ -18,17 +19,22 @@ public class WoolWarsPlugin extends JavaPlugin {
     private Supplies supplies;
     private Hud hud;
     private Placement placement;
+    private PointFinder pointFinder;
     private long tickCount;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        // Merge settings added in newer versions into an existing config.yml.
+        getConfig().options().copyDefaults(true);
+        saveConfig();
         teams = new Teams();
         teams.ensureTeams();
         visuals = new Visuals(this);
         supplies = new Supplies(this);
         hud = new Hud(this);
         placement = new Placement(this);
+        pointFinder = new PointFinder(this);
         game = new Game(this);
         game.load();
         visuals.sweepStrays(getServer().getWorlds());
@@ -95,5 +101,9 @@ public class WoolWarsPlugin extends JavaPlugin {
 
     public Placement placement() {
         return placement;
+    }
+
+    public PointFinder pointFinder() {
+        return pointFinder;
     }
 }

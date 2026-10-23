@@ -8,6 +8,7 @@ import java.util.Map;
 
 import com.woolwars.WoolWarsPlugin;
 import com.woolwars.game.Game;
+import com.woolwars.game.PointFinder;
 import com.woolwars.model.ControlPoint;
 import com.woolwars.model.TeamColor;
 import com.woolwars.util.Msg;
@@ -147,7 +148,8 @@ public class WoolWarsCommand implements TabExecutor {
         line(sender, "/ww join <color> · leave · teams · status", "pick a team, see the game");
         if (sender.hasPermission(ADMIN)) {
             line(sender, "/ww quicklaunch", "auto-place anything missing, count down, teleport, start");
-            line(sender, "/ww point add|remove <n>|list|clear|auto [count] [spread]", "control points");
+            line(sender, "/ww point add|remove <n>|list|clear|tp <n>|auto [count] [spread]", "control points");
+            line(sender, "/ww point find [high|low] [biome:<id>] [structure:<id>] [range:<n>]", "add a point somewhere specific");
             line(sender, "/ww spawn set [color]|clear [color]|list|auto [radius]", "team spawns");
             line(sender, "/ww start · stop · end · pause · resume", "game flow (end declares a winner)");
             line(sender, "/ww timer <minutes>|reset", "minutes for a full rotation through all points");
@@ -193,6 +195,48 @@ public class WoolWarsCommand implements TabExecutor {
                 }
                 game().removePoint(n - 1);
                 Msg.ok(sender, "Removed point #" + n + ". Remaining points renumbered.");
+            }
+            case "find" -> {
+                // Searches from where you stand; from the console, from the world spawn.
+                Location origin = sender instanceof Player player ? player.getLocation()
+                        : Bukkit.getWorlds().get(0).getSpawnLocation();
+                List<String> errors = new ArrayList<>();
+                PointFinder.Query query = plugin.pointFinder().parse(Arrays.copyOfRange(args, 1, args.length), errors);
+                if (query == null) {
+                    errors.forEach(e -> Msg.error(sender, e));
+                    return;
+                }
+                Msg.info(sender, "Searching...");
+                PointFinder.Result result = plugin.pointFinder().find(origin, query);
+                if (result.error() != null) {
+                    Msg.error(sender, result.error());
+                    return;
+                }
+                Block ground = result.ground();
+                ground.getRelative(0, 1, 0).setType(org.bukkit.Material.AIR);
+                String error = game().addPoint(ground);
+                if (error != null) {
+                    Msg.error(sender, error);
+                    return;
+                }
+                int n = game().points().size();
+                Msg.ok(sender, "Added point #" + n + " at " + ground.getX() + ", " + (ground.getY() + 1) + ", " + ground.getZ()
+                        + " (" + result.description() + "). /ww point tp " + n + " to go look.");
+            }
+            case "tp" -> {
+                Player player = requirePlayer(sender);
+                if (player == null) {
+                    return;
+                }
+                int n = args.length > 1 ? parseInt(args[1], -1) : game().activeIndex() + 1;
+                if (n < 1 || n > game().points().size() || game().points().get(n - 1).world() == null) {
+                    Msg.error(sender, "Which point? /ww point tp <1-" + game().points().size() + ">");
+                    return;
+                }
+                ControlPoint p = game().points().get(n - 1);
+                Location to = p.slotCenter().add(0, 1, 2.5);
+                to.setDirection(p.slotCenter().toVector().subtract(to.toVector()));
+                player.teleport(to);
             }
             case "clear" -> {
                 game().clearPoints();
@@ -273,7 +317,7 @@ public class WoolWarsCommand implements TabExecutor {
                     Msg.error(sender, "Add a control point first, or run this in-game.");
                     return;
                 }
-                double radius = args.length > 1 ? parseInt(args[1], 100) : plugin.getConfig().getDouble("auto.spawn-radius", 100);
+                double radius = args.length > 1 ? parseInt(args[1], 100) : plugin.placement().defaultSpawnRadius();
                 autoSpawns(sender, teams, radius, fallback);
             }
             default -> {
@@ -315,7 +359,7 @@ public class WoolWarsCommand implements TabExecutor {
         }
         boolean missingSpawn = teams.stream().anyMatch(t -> game().spawnLocation(t) == null);
         if (missingSpawn) {
-            autoSpawns(sender, teams, plugin.getConfig().getDouble("auto.spawn-radius", 100), player == null ? null : player.getLocation());
+            autoSpawns(sender, teams, plugin.placement().defaultSpawnRadius(), player == null ? null : player.getLocation());
         }
         game().beginCountdown();
     }
@@ -408,7 +452,9 @@ public class WoolWarsCommand implements TabExecutor {
             Msg.info(sender, key + " = " + plugin.getConfig().get(key));
             return;
         }
-        Object current = plugin.getConfig().get(key);
+        // Type-check against the shipped default, so settings like auto.spawn-radius accept both "auto" and numbers.
+        var defaults = plugin.getConfig().getDefaults();
+        Object current = defaults != null && defaults.contains(key) ? defaults.get(key) : plugin.getConfig().get(key);
         String raw = args[1];
         Object value;
         if (current instanceof Boolean) {
@@ -430,7 +476,8 @@ public class WoolWarsCommand implements TabExecutor {
                 return;
             }
         } else {
-            value = raw;
+            Double number = parseDouble(raw, Double.NaN);
+            value = number.isNaN() ? raw : (number == Math.rint(number) ? (Object) number.intValue() : number);
         }
         plugin.getConfig().set(key, value);
         plugin.saveConfig();
@@ -495,7 +542,7 @@ public class WoolWarsCommand implements TabExecutor {
         } else if (args.length == 2) {
             switch (args[0].toLowerCase(Locale.ROOT)) {
                 case "join" -> options.addAll(colorIds());
-                case "point" -> options.addAll(admin ? List.of("add", "remove", "list", "clear", "auto") : List.of());
+                case "point" -> options.addAll(admin ? List.of("add", "find", "remove", "list", "clear", "tp", "auto") : List.of());
                 case "spawn" -> options.addAll(admin ? List.of("set", "clear", "list", "auto") : List.of());
                 case "win" -> options.addAll(List.of("points", "time", "off"));
                 case "timer" -> options.addAll(List.of("reset", "10", "5"));
@@ -505,7 +552,10 @@ public class WoolWarsCommand implements TabExecutor {
                 default -> {
                 }
             }
-        } else if (args.length == 3) {
+        } else if (args.length >= 3 && args[0].equalsIgnoreCase("point") && args[1].equalsIgnoreCase("find") && admin) {
+            options.addAll(plugin.pointFinder().suggestions());
+        }
+        if (args.length == 3) {
             String sub = args[0].toLowerCase(Locale.ROOT);
             String action = args[1].toLowerCase(Locale.ROOT);
             if (sub.equals("team")) {
@@ -513,7 +563,7 @@ public class WoolWarsCommand implements TabExecutor {
                 options.add("none");
             } else if (sub.equals("spawn") && (action.equals("set") || action.equals("clear"))) {
                 options.addAll(colorIds());
-            } else if (sub.equals("point") && action.equals("remove")) {
+            } else if (sub.equals("point") && (action.equals("remove") || action.equals("tp"))) {
                 for (int i = 1; i <= game().points().size(); i++) {
                     options.add(String.valueOf(i));
                 }

@@ -40,8 +40,20 @@ mining-fatigue:
 auto:
   # Distance from the center to each point when placing several.
   point-spread: 40
-  # Distance from the control points to each team spawn.
-  spawn-radius: 100
+  # Distance from the control points to each team spawn, in blocks, or "auto":
+  # far enough that running to the point takes spawn-travel-fraction of the scoring timer.
+  # With a 10 minute timer that's 10 min x 0.25 x 4 blocks/s = 600 blocks.
+  spawn-radius: auto
+  spawn-travel-fraction: 0.25
+  # Blocks per second over real terrain (sprinting on flat ground is ~5.6).
+  run-speed: 4.0
+
+# /ww point find
+find:
+  # How far around you (or around the found biome) to look for high/low ground.
+  search-radius: 96
+  # How far to look for the nearest biome or structure.
+  locate-radius: 3000
 
 visuals:
   # Glowing outline on the wool slot, in the holding team's color (visible through walls).
