@@ -523,6 +523,10 @@ public class Game {
             String original = parts.length == 5 ? parts[4] : Material.STONE.createBlockData().getAsString();
             points.add(new ControlPoint(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
                     Integer.parseInt(parts[3]), original));
+            if (Bukkit.getWorld(parts[0]) == null) {
+                plugin.getLogger().warning("Control point in unknown world '" + parts[0] + "'. Loaded worlds: "
+                        + Bukkit.getWorlds().stream().map(World::getName).toList());
+            }
         }
         ConfigurationSection spawnSection = data.getConfigurationSection("spawns");
         if (spawnSection != null) {
