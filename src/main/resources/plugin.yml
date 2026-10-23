@@ -1,0 +1,21 @@
+name: WoolWars
+version: ${project.version}
+main: com.woolwars.WoolWarsPlugin
+api-version: '26.3'
+description: Hold the control point with your team's wool when the timer hits zero.
+authors: [Eccentr1city]
+
+commands:
+  woolwars:
+    description: Wool Wars commands (/ww help)
+    aliases: [ww]
+    usage: /<command> help
+    permission: woolwars.use
+
+permissions:
+  woolwars.use:
+    description: Join teams and view the game
+    default: true
+  woolwars.admin:
+    description: Set up, start and control games
+    default: op

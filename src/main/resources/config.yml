@@ -1,0 +1,60 @@
+# Wool Wars settings. Change these in-game with /ww config <key> <value>.
+
+# Minutes for a full rotation through all control points.
+# One point: scored every round-minutes. Three points: one is scored every round-minutes / 3.
+round-minutes: 10
+
+# Optional win condition (0 = off). Usually agreed out loud instead.
+win:
+  # First team to this many points wins.
+  points: 0
+  # After this many minutes of play, the team with the most points wins.
+  time-minutes: 0
+
+# Items handed to team players, refilled the tick they run out. Each keeps to one inventory slot.
+# Team wool is always supplied.
+supply:
+  torches: true
+  # Iron pickaxe, Fortune II + Unbreaking III (plus Efficiency IV with nether gear).
+  pickaxe: true
+  # Infinity bow plus the one arrow it needs.
+  bow: true
+  # Compass that points at the next control point to be scored.
+  compass: true
+
+# Nether gear: Efficiency on the pickaxe, 10 obsidian + flint and steel at game start,
+# and 10s of fire resistance when respawning in the Nether.
+# auto = on whenever a control point is in the Nether. Also accepts on / off.
+nether-gear: auto
+
+# Fraction of each item stack dropped on death (0 = full keep inventory). Supplied items never drop.
+death-drop-fraction: 0.0
+
+# Mining fatigue for anyone near a control point, to discourage digging around it.
+mining-fatigue:
+  enabled: false
+  level: 3
+  radius: 12
+
+# Defaults for /ww point auto and /ww spawn auto (and /ww quicklaunch).
+auto:
+  # Distance from the center to each point when placing several.
+  point-spread: 40
+  # Distance from the control points to each team spawn.
+  spawn-radius: 100
+
+visuals:
+  # Glowing outline on the wool slot, in the holding team's color (visible through walls).
+  glow: true
+  # Colored beam rising from each control point.
+  beam: true
+  # Make the beam of the next point to be scored glow too.
+  highlight-active-beam: true
+
+hud:
+  sidebar: true
+  # Action bar showing where the next point is.
+  action-bar: true
+
+# Chat + sound when a point changes hands.
+announce-captures: true

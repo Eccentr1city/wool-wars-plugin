@@ -1,0 +1,77 @@
+# Wool Wars
+
+A Paper plugin for Wool Wars: teams fight to keep their wool on a control point, and whoever holds it when the timer hits zero scores. It replaces the old [wool_wars datapack](https://github.com/Eccentr1city/wool_wars) and borrows the good parts of [Beacon War](https://github.com/VH-abc/beacon-war-plugin).
+
+Built for **Paper 26.3** (Java 25).
+
+## Rules
+
+- A control point is a bedrock base. The block on top of it is the wool slot.
+- Put your team's wool in the slot to hold the point. Break theirs, place yours.
+- When the timer hits zero, the team holding the point scores 1 point. If the slot is empty, no one scores.
+- With several points, they take turns being scored, in order. A full rotation takes `round-minutes` (default 10), so with 3 points one is scored every 3:20.
+- Any number of teams, one per wool color (up to 16).
+- No win condition by default; optionally first to N points or most points after M minutes (`/ww win`).
+
+## What players get
+
+- Their team's wool, torches, a Fortune II iron pickaxe, an Infinity bow (+1 arrow), and a tracker compass. Each is refilled the tick it runs out and kept to one inventory slot.
+- The compass and action bar point at the next control point to be scored (with distance, or which dimension it's in).
+- Boss bar with the countdown and who's holding the point, sidebar with scores, titles and sounds for captures and scoring.
+- Each control point has a glowing outline (visible through walls) and a colored beam in the holder's color. The beam of the next point to be scored glows too. No real beacon involved.
+- Full keep-inventory on death; team spawns override beds.
+- Nether gear when a point is in the Nether: Efficiency IV on the pickaxe, obsidian + flint and steel at the start, fire resistance on respawn.
+
+## Quick start
+
+1. Drop `WoolWars-2.0.0.jar` into the server's `plugins/` folder and restart.
+2. Everyone joins a team: `/ww join red` (or `/team join ww_red`, same thing).
+3. An op stands where the fight should be and runs `/ww quicklaunch`. It places a control point there if none exists, spreads team spawns around it, counts down from 10, teleports everyone to their spawn and starts.
+
+For more control, set things up by hand:
+
+```
+/ww point add          # turn the block you're looking at (or standing on) into a control point
+/ww point auto 3 50    # or: replace all points with 3 placed 50 blocks around you
+/ww spawn set red      # red's spawn = where you're standing
+/ww spawn auto 120     # or: spawns for every team with players, 120 blocks out from the points
+/ww start
+```
+
+## Commands
+
+Players:
+
+| Command | |
+|---|---|
+| `/ww join <color>` · `/ww leave` | Pick or leave a team |
+| `/ww teams` | Who's on which team |
+| `/ww status` | State, timer, points, scores |
+
+Admins (op):
+
+| Command | |
+|---|---|
+| `/ww quicklaunch` | Auto-place anything missing, count down, teleport, start |
+| `/ww point add \| remove <n> \| list \| clear \| auto [count] [spread]` | Control points (any dimension) |
+| `/ww spawn set [color] \| clear [color] \| list \| auto [radius]` | Team spawns |
+| `/ww start` · `stop` · `end` · `pause` · `resume` | `start` resets scores; `end` declares the leader the winner |
+| `/ww timer <minutes> \| reset` | Length of a full rotation |
+| `/ww win points <n> \| time <minutes> \| off` | Optional win condition |
+| `/ww team <player> <color\|none>` | Put someone on a team |
+| `/ww scores reset` | Zero the scores |
+| `/ww config [key] [value]` · `/ww reload` | View or change any setting in `config.yml` |
+
+Toggles you might want, e.g. `/ww config mining-fatigue.enabled true`, `/ww config death-drop-fraction 0.25`, `/ww config nether-gear on`. See [config.yml](src/main/resources/config.yml) for all of them.
+
+Points, spawns and scores are saved to `plugins/WoolWars/data.yml`, so a restart doesn't lose the game (a running game comes back paused). Teams live in the vanilla scoreboard.
+
+## Building
+
+Needs JDK 25 and Maven.
+
+```bash
+mvn package
+```
+
+The jar lands in `target/WoolWars-2.0.0.jar`.
