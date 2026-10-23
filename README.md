@@ -1,6 +1,6 @@
 # Wool Wars
 
-A Paper plugin for Wool Wars: teams fight to keep their wool on a control point, and whoever holds it when the timer hits zero scores. It replaces the old [wool_wars datapack](https://github.com/Eccentr1city/wool_wars) and borrows the good parts of [Beacon War](https://github.com/VH-abc/beacon-war-plugin).
+A Paper plugin for the Minecraft minigame Wool Wars: teams fight to keep their wool on a control point, and whoever holds it when the timer hits zero scores. It replaces the old [wool_wars datapack](https://github.com/Eccentr1city/wool_wars) and borrows the good parts of [Beacon Wars](https://github.com/VH-abc/beacon-war-plugin).
 
 Built for **Paper 26.3** (Java 25).
 
