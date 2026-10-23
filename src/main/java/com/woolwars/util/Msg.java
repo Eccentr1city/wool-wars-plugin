@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 public final class Msg {
     private static final Component PREFIX = Component.text("[Wool Wars] ", NamedTextColor.GOLD, TextDecoration.BOLD);
@@ -53,6 +54,18 @@ public final class Msg {
         for (Player player : Bukkit.getOnlinePlayers()) {
             player.playSound(player.getLocation(), sound, volume, pitch);
         }
+    }
+
+    /** Plays {@code pitches} one after another, {@code gapTicks} apart, to everyone. */
+    public static void jingle(Plugin plugin, Sound sound, float volume, int gapTicks, float... pitches) {
+        for (int i = 0; i < pitches.length; i++) {
+            float pitch = pitches[i];
+            Bukkit.getScheduler().runTaskLater(plugin, () -> soundAll(sound, volume, pitch), (long) i * gapTicks);
+        }
+    }
+
+    public static String capitalize(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     /** m:ss */

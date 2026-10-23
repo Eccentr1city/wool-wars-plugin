@@ -50,7 +50,7 @@ public class Hud {
         TeamColor holder = active.owner();
         Component holderText = holder == null ? Component.text("empty", NamedTextColor.GRAY)
                 : Component.text("held by ", NamedTextColor.WHITE).append(holder.label());
-        String what = capitalize(game.pointName(game.activeIndex()));
+        String what = Msg.capitalize(game.pointName(game.activeIndex()));
         Component name;
         float progress = 1f;
         switch (game.state()) {
@@ -82,7 +82,7 @@ public class Hud {
                 continue;
             }
             Component text = Component.text("➤ ", NamedTextColor.AQUA)
-                    .append(Component.text(capitalize(plugin.game().pointName(plugin.game().activeIndex())) + " ",
+                    .append(Component.text(Msg.capitalize(plugin.game().pointName(plugin.game().activeIndex())) + " ",
                             NamedTextColor.WHITE))
                     .append(Component.text("(" + active.coords() + ")", NamedTextColor.GRAY));
             if (active.world().equals(player.getWorld())) {
@@ -138,9 +138,5 @@ public class Hud {
 
     public void hideAll() {
         Bukkit.getOnlinePlayers().forEach(p -> p.hideBossBar(bar));
-    }
-
-    private static String capitalize(String s) {
-        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 }

@@ -155,8 +155,11 @@ public class Game {
         ControlPoint point = points.get(activeIndex);
         TeamColor owner = point.isLoaded() ? TeamColor.fromWool(point.slot().getType()) : null;
 
-        Msg.soundAll(Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.6f, 1f);
         if (owner != null) {
+            // Rising major arpeggio on bells, then a firework twinkle.
+            Msg.jingle(plugin, Sound.BLOCK_NOTE_BLOCK_BELL, 0.8f, 3, 1.0f, 1.26f, 1.5f, 2.0f);
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> Msg.soundAll(Sound.ENTITY_FIREWORK_ROCKET_TWINKLE, 0.7f, 1f), 12);
             int score = scores.merge(owner, 1, Integer::sum);
             Msg.titleAll(Component.empty().append(owner.label()).append(Component.text(" scores!", NamedTextColor.YELLOW)),
                     Component.text(pointName(activeIndex) + " · " + score + (score == 1 ? " point" : " points"),
@@ -165,9 +168,10 @@ public class Game {
                     .append(Component.text(" held " + pointName(activeIndex) + " and scores! ", NamedTextColor.GREEN))
                     .append(Component.text("(" + score + ")", NamedTextColor.WHITE)));
         } else {
+            Msg.jingle(plugin, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 4, 0.8f, 0.6f);
             Msg.titleAll(Component.text("No one scores", NamedTextColor.GRAY),
-                    Component.text(pointName(activeIndex) + " was empty", NamedTextColor.DARK_GRAY), 3);
-            Msg.broadcast(Component.text(pointName(activeIndex) + " was empty. No one scores.", NamedTextColor.GRAY));
+                    Component.text(Msg.capitalize(pointName(activeIndex)) + " was empty", NamedTextColor.DARK_GRAY), 3);
+            Msg.broadcast(Component.text(Msg.capitalize(pointName(activeIndex)) + " was empty. No one scores.", NamedTextColor.GRAY));
         }
         dirty = true;
 
@@ -239,7 +243,7 @@ public class Game {
         Msg.titleAll(Component.text("Wool Wars", NamedTextColor.GOLD, TextDecoration.BOLD),
                 Component.text("Hold " + pointName(0) + " when the timer hits zero", NamedTextColor.YELLOW), 3);
         Msg.soundAll(Sound.ENTITY_ENDER_DRAGON_GROWL, 0.4f, 1.2f);
-        Msg.broadcast(Component.text("Game started! " + pointName(0) + " is scored in "
+        Msg.broadcast(Component.text("Game started! " + Msg.capitalize(pointName(0)) + " is scored in "
                 + Msg.clock(ticksLeft / 20) + ".", NamedTextColor.GREEN));
         return true;
     }
