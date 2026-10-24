@@ -28,7 +28,12 @@ You need a **Paper 26.3** server (from [papermc.io](https://papermc.io/downloads
 
 ### 1. Get the plugin jar
 
-Build it from this repo (needs JDK 25 and Maven):
+**[Download WoolWars-2.0.0.jar](https://github.com/Eccentr1city/wool-wars-plugin/releases/download/v2.0.0/WoolWars-2.0.0.jar)** (or grab the newest from [Releases](https://github.com/Eccentr1city/wool-wars-plugin/releases)).
+
+<details>
+<summary>Or build it yourself</summary>
+
+Needs JDK 25 and Maven:
 
 ```bash
 git clone https://github.com/Eccentr1city/wool-wars-plugin.git
@@ -36,7 +41,9 @@ cd wool-wars-plugin
 mvn package
 ```
 
-The jar is now at **`wool-wars-plugin/target/WoolWars-2.0.0.jar`**.
+The jar is then at `wool-wars-plugin/target/WoolWars-2.0.0.jar`.
+
+</details>
 
 ### 2. Install it
 
