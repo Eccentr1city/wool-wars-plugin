@@ -24,11 +24,44 @@ Built for **Paper 26.3** (Java 25).
 
 ## Quick start
 
-1. Drop `WoolWars-2.0.0.jar` into the server's `plugins/` folder and restart.
-2. Everyone joins a team: `/ww join red` (or `/team join ww_red`, same thing).
-3. An op stands where the fight should be and runs `/ww quicklaunch`. It places a control point there if none exists, spreads team spawns around it, counts down from 10, teleports everyone to their spawn and starts.
+You need a **Paper 26.3** server (from [papermc.io](https://papermc.io/downloads/paper)). Realms and vanilla servers can't run plugins.
 
-For more control, set things up by hand:
+### 1. Get the plugin jar
+
+Build it from this repo (needs JDK 25 and Maven):
+
+```bash
+git clone https://github.com/Eccentr1city/wool-wars-plugin.git
+cd wool-wars-plugin
+mvn package
+```
+
+The jar is now at **`wool-wars-plugin/target/WoolWars-2.0.0.jar`**.
+
+### 2. Install it
+
+Copy that jar into the server's `plugins/` folder (next to `paper.jar`), then restart the server:
+
+```
+your-server/
+├── paper.jar
+└── plugins/
+    └── WoolWars-2.0.0.jar   <- here
+```
+
+The server log should say `Wool Wars ready`. Settings are created at `plugins/WoolWars/config.yml`.
+
+### 3. Play
+
+1. Make yourself an operator: type `op <your name>` in the server console.
+2. Everyone picks a team in chat: `/ww join red`, `/ww join blue`, and so on.
+3. The op stands where the fight should be and runs **`/ww quicklaunch`**. It places a control point there, puts team spawns around it, counts down from 10, teleports everyone to their spawn and starts the timer.
+
+That's it. `/ww help` lists everything else.
+
+### Setting things up by hand
+
+For more control over where things go:
 
 ```
 /ww point add          # turn the block you're looking at (or standing on) into a control point
@@ -87,13 +120,3 @@ Admins (op):
 Toggles you might want, e.g. `/ww config mining-fatigue.enabled true`, `/ww config death-drop-fraction 0.25`, `/ww config nether-gear on`. See [config.yml](src/main/resources/config.yml) for all of them.
 
 Points, spawns and scores are saved to `plugins/WoolWars/data.yml`, so a restart doesn't lose the game (a running game comes back paused). Teams live in the vanilla scoreboard.
-
-## Building
-
-Needs JDK 25 and Maven.
-
-```bash
-mvn package
-```
-
-The jar lands in `target/WoolWars-2.0.0.jar`.
