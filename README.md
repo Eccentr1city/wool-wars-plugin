@@ -28,7 +28,7 @@ You need a **Paper 26.3** server (from [papermc.io](https://papermc.io/downloads
 
 ### 1. Get the plugin jar
 
-**[Download WoolWars-2.1.0.jar](https://github.com/Eccentr1city/wool-wars-plugin/releases/download/v2.1.0/WoolWars-2.1.0.jar)** (or grab the newest from [Releases](https://github.com/Eccentr1city/wool-wars-plugin/releases)).
+**[Download WoolWars-2.1.1.jar](https://github.com/Eccentr1city/wool-wars-plugin/releases/download/v2.1.1/WoolWars-2.1.1.jar)** (or grab the newest from [Releases](https://github.com/Eccentr1city/wool-wars-plugin/releases)).
 
 <details>
 <summary>Or build it yourself</summary>
@@ -41,7 +41,7 @@ cd wool-wars-plugin
 mvn package
 ```
 
-The jar is then at `wool-wars-plugin/target/WoolWars-2.1.0.jar`.
+The jar is then at `wool-wars-plugin/target/WoolWars-2.1.1.jar`.
 
 </details>
 
@@ -53,7 +53,7 @@ Copy that jar into the server's `plugins/` folder (next to `paper.jar`), then re
 your-server/
 ├── paper.jar
 └── plugins/
-    └── WoolWars-2.1.0.jar   <- here
+    └── WoolWars-2.1.1.jar   <- here
 ```
 
 The server log should say `Wool Wars ready`. Settings are created at `plugins/WoolWars/config.yml`.
