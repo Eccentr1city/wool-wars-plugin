@@ -83,6 +83,10 @@ public class ControlPoint {
         this.ownerKnown = true;
     }
 
+    public void forgetOwner() {
+        ownerKnown = false;
+    }
+
     /** False until the slot has been read once, so the first read isn't announced as a capture. */
     public boolean ownerKnown() {
         return ownerKnown;

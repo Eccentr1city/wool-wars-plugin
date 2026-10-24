@@ -44,6 +44,9 @@ public class GameListener implements Listener {
     /** Keep inventory by default; optionally drop a fraction of each non-supplied stack. */
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
+        if (!plugin.isActive()) {
+            return;
+        }
         Player player = event.getPlayer();
         TeamColor team = plugin.teams().teamOf(player);
         if (team == null) {
@@ -81,6 +84,9 @@ public class GameListener implements Listener {
     /** Team spawn always wins over beds and world spawn; a little fire resistance when respawning in the Nether. */
     @EventHandler(priority = EventPriority.HIGH)
     public void onRespawn(PlayerRespawnEvent event) {
+        if (!plugin.isActive()) {
+            return;
+        }
         TeamColor team = plugin.teams().teamOf(event.getPlayer());
         if (team == null) {
             return;

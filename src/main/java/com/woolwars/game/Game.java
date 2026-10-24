@@ -365,7 +365,9 @@ public class Game {
                 : base.getBlockData().getAsString();
         ControlPoint point = new ControlPoint(base.getWorld().getName(), base.getX(), base.getY(), base.getZ(), original);
         base.setType(Material.BEDROCK);
-        base.getChunk().addPluginChunkTicket(plugin);
+        if (plugin.isActive()) {
+            base.getChunk().addPluginChunkTicket(plugin);
+        }
         points.add(point);
         afterPointsChanged();
         return null;
@@ -607,11 +609,39 @@ public class Game {
         activeIndex = points.isEmpty() ? 0 : Math.min(data.getInt("active-index"), points.size() - 1);
         ticksLeft = data.getLong("ticks-left", intervalTicks());
         elapsedTicks = data.getLong("elapsed-ticks");
-        // Keep point chunks loaded so ownership is always readable and scoring never sees an unloaded slot.
+        if (plugin.isActive()) {
+            holdPointChunks();
+        }
+    }
+
+    /** Keeps point chunks loaded so ownership is always readable and scoring never sees an unloaded slot. */
+    public void holdPointChunks() {
         for (ControlPoint point : points) {
             if (point.world() != null) {
                 point.world().addPluginChunkTicket(point.x() >> 4, point.z() >> 4, plugin);
             }
         }
+    }
+
+    public void releasePointChunks() {
+        for (ControlPoint point : points) {
+            if (point.world() != null) {
+                point.world().removePluginChunkTicket(point.x() >> 4, point.z() >> 4, plugin);
+            }
+        }
+    }
+
+    /** Freezes the game when Wool Wars is switched off: a running game pauses, a countdown is dropped. */
+    public void suspend() {
+        if (state == State.RUNNING) {
+            state = State.PAUSED;
+        } else if (state == State.COUNTDOWN) {
+            state = State.IDLE;
+        }
+        // Owners are re-read silently when switched back on, so changes made meanwhile aren't announced.
+        for (ControlPoint point : points) {
+            point.forgetOwner();
+        }
+        dirty = true;
     }
 }

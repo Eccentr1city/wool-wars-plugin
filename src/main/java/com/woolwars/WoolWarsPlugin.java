@@ -46,7 +46,11 @@ public class WoolWarsPlugin extends JavaPlugin {
         ww.setTabCompleter(command);
 
         getServer().getScheduler().runTaskTimer(this, this::tick, 1L, 1L);
-        getLogger().info("Wool Wars ready: " + game.points().size() + " control point(s), state " + game.state());
+        if (!isActive()) {
+            hud.clear();
+        }
+        getLogger().info("Wool Wars ready: " + game.points().size() + " control point(s), state " + game.state()
+                + (isActive() ? "" : " (switched off: /ww enable)"));
     }
 
     @Override
@@ -62,8 +66,36 @@ public class WoolWarsPlugin extends JavaPlugin {
         }
     }
 
+    /** Whether Wool Wars is switched on. When off, the plugin leaves the server alone for other games. */
+    public boolean isActive() {
+        return getConfig().getBoolean("enabled", true);
+    }
+
+    /**
+     * Switches Wool Wars on or off. Turning it off pauses any game and removes everything players can see or feel
+     * (supplies, compass, HUD, beams, effects, death/respawn rules); points, spawns, teams and scores are kept.
+     */
+    public void setActive(boolean active) {
+        getConfig().set("enabled", active);
+        saveConfig();
+        if (active) {
+            game.holdPointChunks();
+        } else {
+            game.suspend();
+            game.releasePointChunks();
+            visuals.removeAll();
+            hud.clear();
+        }
+    }
+
     private void tick() {
         tickCount++;
+        if (!isActive()) {
+            if (tickCount % 600 == 0) {
+                game.saveIfDirty();
+            }
+            return;
+        }
         game.tick();
         supplies.supplyAll();
         if (tickCount % 10 == 0) {

@@ -195,16 +195,22 @@ public class Placement {
         CompletableFuture.allOf(loads.toArray(new CompletableFuture[0])).whenComplete((v, loadError) ->
                 // Paper completes chunk futures on the main thread; hop there explicitly in case one was already done.
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    try {
-                        if (loadError != null) {
-                            result.completeExceptionally(loadError);
-                        } else {
-                            result.complete(work.get());
+                    T value = null;
+                    Throwable failure = loadError;
+                    if (failure == null) {
+                        try {
+                            value = work.get();
+                        } catch (RuntimeException e) {
+                            failure = e;
                         }
-                    } catch (RuntimeException e) {
-                        result.completeExceptionally(e);
-                    } finally {
-                        ticketed.forEach(c -> world.removePluginChunkTicket(c[0], c[1], plugin));
+                    }
+                    // Release before completing: callers often place a control point here, which takes its own
+                    // ticket on the chunk, and tickets aren't counted, so releasing afterwards would drop that one too.
+                    ticketed.forEach(c -> world.removePluginChunkTicket(c[0], c[1], plugin));
+                    if (failure != null) {
+                        result.completeExceptionally(failure);
+                    } else {
+                        result.complete(value);
                     }
                 }));
         return result;

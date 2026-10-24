@@ -70,6 +70,8 @@ Everyone's inventory is cleared when the game starts.
 
 **Uneven teams:** `/ww resistance blue 1` gives the smaller team Resistance I (20% less damage per level, up to 4). It's reapplied when they respawn.
 
+**Playing something else:** `/ww disable` switches Wool Wars off so other plugins' games can use the server. The game pauses and the beams, HUD, auto-supplied items, effects and keep-inventory/respawn rules all stop. Control points, spawns, teams and scores are kept. `/ww enable` brings it all back (then `/ww resume`). The switch survives restarts.
+
 That's it. `/ww help` lists everything else.
 
 ### Setting things up by hand
@@ -119,6 +121,7 @@ Admins (op):
 
 | Command | |
 |---|---|
+| `/ww enable` · `/ww disable` | Switch Wool Wars on or off (off = does nothing, for other games) |
 | `/ww quicklaunch` | Auto-place anything missing, count down, teleport, start |
 | `/ww quicklaunch new [blocks] [filters]` | Wipe this arena, set up a fresh one far away, then quicklaunch |
 | `/ww reset [all]` | Clear control points, spawns and scores; `all` also clears teams and team resistance |

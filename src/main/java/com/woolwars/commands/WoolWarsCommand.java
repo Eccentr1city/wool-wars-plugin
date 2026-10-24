@@ -28,9 +28,12 @@ import org.bukkit.entity.Player;
 
 public class WoolWarsCommand implements TabExecutor {
     private static final String ADMIN = "woolwars.admin";
+    /** Commands that still work while Wool Wars is switched off. */
+    private static final List<String> ALWAYS_AVAILABLE = List.of("enable", "on", "disable", "off", "help", "status",
+            "teams", "config", "reload", "reset");
     private static final List<String> PLAYER_SUBS = List.of("help", "join", "leave", "teams", "status");
     private static final List<String> ADMIN_SUBS = List.of("point", "spawn", "start", "stop", "end", "pause", "resume",
-            "quicklaunch", "reset", "resistance", "timer", "scores", "win", "team", "config", "reload");
+            "quicklaunch", "reset", "resistance", "enable", "disable", "timer", "scores", "win", "team", "config", "reload");
 
     private final WoolWarsPlugin plugin;
     /** True while a background setup (point/spawn placement, quicklaunch) is running. */
@@ -74,13 +77,35 @@ public class WoolWarsCommand implements TabExecutor {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
         String[] rest = Arrays.copyOfRange(args, Math.min(1, args.length), args.length);
-        if (ADMIN_SUBS.contains(sub) || sub.equals("unpause") || sub.equals("ql")) {
+        if (ADMIN_SUBS.contains(sub) || sub.equals("unpause") || sub.equals("ql") || sub.equals("on") || sub.equals("off")) {
             if (!sender.hasPermission(ADMIN)) {
                 Msg.error(sender, "You need to be an admin (op) for that.");
                 return true;
             }
         }
+        if (!plugin.isActive() && !ALWAYS_AVAILABLE.contains(sub)) {
+            Msg.error(sender, "Wool Wars is switched off. An op can turn it on with /ww enable.");
+            return true;
+        }
         switch (sub) {
+            case "enable", "on" -> {
+                if (plugin.isActive()) {
+                    Msg.info(sender, "Wool Wars is already on.");
+                    return true;
+                }
+                plugin.setActive(true);
+                Msg.broadcast(Component.text("Wool Wars is on." + (game().state() == Game.State.PAUSED
+                        ? " The game is paused; /ww resume to continue." : ""), NamedTextColor.GREEN));
+            }
+            case "disable", "off" -> {
+                if (!plugin.isActive()) {
+                    Msg.info(sender, "Wool Wars is already off.");
+                    return true;
+                }
+                plugin.setActive(false);
+                Msg.broadcast(Component.text("Wool Wars is off. Points, teams and scores are kept for /ww enable.",
+                        NamedTextColor.RED));
+            }
             case "join" -> join(sender, rest);
             case "leave" -> leave(sender);
             case "teams" -> teams(sender);
@@ -113,6 +138,7 @@ public class WoolWarsCommand implements TabExecutor {
             case "reload" -> {
                 plugin.reloadConfig();
                 plugin.visuals().removeAll();
+                plugin.setActive(plugin.isActive());
                 Msg.ok(sender, "Config reloaded.");
             }
             default -> help(sender);
@@ -161,6 +187,9 @@ public class WoolWarsCommand implements TabExecutor {
 
     private void status(CommandSender sender) {
         Game g = game();
+        if (!plugin.isActive()) {
+            Msg.info(sender, Component.text("Wool Wars is switched off (/ww enable to turn it on).", NamedTextColor.RED));
+        }
         Msg.info(sender, Component.text("State: " + g.state().name().toLowerCase(Locale.ROOT)
                 + (g.state() == Game.State.IDLE ? "" : " · " + Msg.clock(g.ticksLeft() / 20) + " until "
                 + g.pointName(g.activeIndex()) + " scores"), NamedTextColor.YELLOW));
@@ -182,6 +211,7 @@ public class WoolWarsCommand implements TabExecutor {
         Msg.info(sender, "Commands:");
         line(sender, "/ww join <color> · leave · teams · status", "pick a team, see the game");
         if (sender.hasPermission(ADMIN)) {
+            line(sender, "/ww enable · disable", "switch all Wool Wars behavior on or off (for other games)");
             line(sender, "/ww quicklaunch", "auto-place anything missing, count down, teleport, start");
             line(sender, "/ww quicklaunch new [blocks] [filters]", "wipe this arena, set up a fresh one far away, start");
             line(sender, "/ww reset [all]", "clear points, spawns and scores (all: also teams and resistance)");
@@ -645,6 +675,12 @@ public class WoolWarsCommand implements TabExecutor {
         } else {
             Double number = parseDouble(raw, Double.NaN);
             value = number.isNaN() ? raw : (number == Math.rint(number) ? (Object) number.intValue() : number);
+        }
+        if (key.equals("enabled")) {
+            // Same as /ww enable or /ww disable, including the cleanup.
+            plugin.setActive((Boolean) value);
+            Msg.ok(sender, "Wool Wars is " + ((Boolean) value ? "on." : "off."));
+            return;
         }
         plugin.getConfig().set(key, value);
         plugin.saveConfig();

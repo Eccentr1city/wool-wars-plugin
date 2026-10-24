@@ -1,5 +1,9 @@
 # Wool Wars settings. Change these in-game with /ww config <key> <value>.
 
+# Master switch, flipped with /ww enable and /ww disable. When off, Wool Wars does nothing
+# (no items, HUD, beams, effects or death/respawn changes) so other games can use the server.
+enabled: true
+
 # Minutes for a full rotation through all control points.
 # One point: scored every round-minutes. Three points: one is scored every round-minutes / 3.
 round-minutes: 10

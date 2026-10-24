@@ -136,6 +136,17 @@ public class Hud {
         sidebarEntries.addAll(current);
     }
 
+    /** Hides the boss bar and removes the sidebar, leaving the screen to whatever else is running. */
+    public void clear() {
+        hideAll();
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Objective objective = board.getObjective(OBJECTIVE);
+        if (objective != null) {
+            objective.unregister();
+        }
+        sidebarEntries.clear();
+    }
+
     public void hideAll() {
         Bukkit.getOnlinePlayers().forEach(p -> p.hideBossBar(bar));
     }
