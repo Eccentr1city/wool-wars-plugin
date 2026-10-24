@@ -54,6 +54,16 @@ public class Teams {
         }
     }
 
+    /** Takes everyone off every Wool Wars team. */
+    public void clearAll() {
+        for (TeamColor color : TeamColor.values()) {
+            Team team = board().getTeam(color.teamName());
+            if (team != null) {
+                team.getEntries().forEach(team::removeEntry);
+            }
+        }
+    }
+
     /** Teams with at least one member (online or not). */
     public List<TeamColor> activeTeams() {
         List<TeamColor> active = new ArrayList<>();

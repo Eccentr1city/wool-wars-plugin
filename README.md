@@ -64,6 +64,12 @@ The server log should say `Wool Wars ready`. Settings are created at `plugins/Wo
 2. Everyone picks a team in chat: `/ww join red`, `/ww join blue`, and so on.
 3. The op stands where the fight should be and runs **`/ww quicklaunch`**. It places a control point there, puts team spawns around it, counts down from 10, teleports everyone to their spawn and starts the timer.
 
+Everyone's inventory is cleared when the game starts.
+
+**Next round:** run **`/ww quicklaunch new`**. It wipes the old arena (control points, spawns, scores) and builds a fresh one far away in a random direction, so the rounds don't overlap. Teams stay the same. Add a distance or [filters](#picking-interesting-spots) if you like: `/ww quicklaunch new 3000`, `/ww quicklaunch new structure:village`. Setting up an arena far away takes 20–40 seconds while the terrain generates; the server keeps running meanwhile.
+
+**Uneven teams:** `/ww resistance blue 1` gives the smaller team Resistance I (20% less damage per level, up to 4). It's reapplied when they respawn.
+
 That's it. `/ww help` lists everything else.
 
 ### Setting things up by hand
@@ -114,6 +120,9 @@ Admins (op):
 | Command | |
 |---|---|
 | `/ww quicklaunch` | Auto-place anything missing, count down, teleport, start |
+| `/ww quicklaunch new [blocks] [filters]` | Wipe this arena, set up a fresh one far away, then quicklaunch |
+| `/ww reset [all]` | Clear control points, spawns and scores; `all` also clears teams and team resistance |
+| `/ww resistance <color> <0-4>` | Handicap a team with Resistance; 0 removes it |
 | `/ww point add \| remove <n> \| list \| clear \| tp <n> \| auto [count] [spread]` | Control points (any dimension) |
 | `/ww point find [high\|low] [biome:<id>] [structure:<id>] [range:<blocks>]` | Add a point somewhere specific |
 | `/ww spawn set [color] \| clear [color] \| list \| auto [radius]` | Team spawns |
@@ -124,6 +133,6 @@ Admins (op):
 | `/ww scores reset` | Zero the scores |
 | `/ww config [key] [value]` · `/ww reload` | View or change any setting in `config.yml` |
 
-Toggles you might want, e.g. `/ww config mining-fatigue.enabled true`, `/ww config death-drop-fraction 0.25`, `/ww config nether-gear on`. See [config.yml](src/main/resources/config.yml) for all of them.
+Starting a game clears team players' inventories; turn that off with `/ww config clear-inventory-on-start false`. Other toggles you might want, e.g. `/ww config mining-fatigue.enabled true`, `/ww config death-drop-fraction 0.25`, `/ww config nether-gear on`. See [config.yml](src/main/resources/config.yml) for all of them.
 
 Points, spawns and scores are saved to `plugins/WoolWars/data.yml`, so a restart doesn't lose the game (a running game comes back paused). Teams live in the vanilla scoreboard.

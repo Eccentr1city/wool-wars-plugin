@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
+import java.util.logging.Level;
 
 import com.woolwars.WoolWarsPlugin;
 import com.woolwars.game.Game;
@@ -27,12 +30,40 @@ public class WoolWarsCommand implements TabExecutor {
     private static final String ADMIN = "woolwars.admin";
     private static final List<String> PLAYER_SUBS = List.of("help", "join", "leave", "teams", "status");
     private static final List<String> ADMIN_SUBS = List.of("point", "spawn", "start", "stop", "end", "pause", "resume",
-            "quicklaunch", "timer", "scores", "win", "team", "config", "reload");
+            "quicklaunch", "reset", "resistance", "timer", "scores", "win", "team", "config", "reload");
 
     private final WoolWarsPlugin plugin;
+    /** True while a background setup (point/spawn placement, quicklaunch) is running. */
+    private boolean busy;
 
     public WoolWarsCommand(WoolWarsPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Runs a setup step that loads terrain in the background. Only one runs at a time, so two admins (or one
+     * impatient one) can't interleave placements.
+     */
+    private void setupTask(CommandSender sender, Supplier<CompletableFuture<?>> task) {
+        if (busy) {
+            Msg.error(sender, "Still working on the last setup command; give it a moment.");
+            return;
+        }
+        busy = true;
+        CompletableFuture<?> running;
+        try {
+            running = task.get();
+        } catch (RuntimeException e) {
+            busy = false;
+            throw e;
+        }
+        running.whenComplete((v, error) -> {
+            busy = false;
+            if (error != null) {
+                Msg.error(sender, "Setup failed: " + error.getMessage());
+                plugin.getLogger().log(Level.WARNING, "Setup command failed", error);
+            }
+        });
     }
 
     private Game game() {
@@ -72,7 +103,9 @@ public class WoolWarsCommand implements TabExecutor {
             case "end" -> game().end(game().leader());
             case "pause" -> game().pause();
             case "resume", "unpause" -> game().resume();
-            case "quicklaunch", "ql" -> quicklaunch(sender);
+            case "quicklaunch", "ql" -> quicklaunch(sender, rest);
+            case "reset" -> reset(sender, rest);
+            case "resistance" -> resistance(sender, rest);
             case "timer" -> timer(sender, rest);
             case "win" -> win(sender, rest);
             case "team" -> team(sender, rest);
@@ -120,7 +153,9 @@ public class WoolWarsCommand implements TabExecutor {
             Location spawn = game().spawnLocation(color);
             sender.sendMessage(Component.text("  ").append(color.label())
                     .append(Component.text(": " + String.join(", ", plugin.teams().members(color)), NamedTextColor.WHITE))
-                    .append(Component.text(spawn == null ? "  (no spawn)" : "  (spawn set)", NamedTextColor.DARK_GRAY)));
+                    .append(Component.text(spawn == null ? "  (no spawn)" : "  (spawn set)", NamedTextColor.DARK_GRAY))
+                    .append(Component.text(game().resistance(color) > 0 ? "  Resistance " + roman(game().resistance(color)) : "",
+                            NamedTextColor.DARK_GRAY)));
         }
     }
 
@@ -148,6 +183,9 @@ public class WoolWarsCommand implements TabExecutor {
         line(sender, "/ww join <color> · leave · teams · status", "pick a team, see the game");
         if (sender.hasPermission(ADMIN)) {
             line(sender, "/ww quicklaunch", "auto-place anything missing, count down, teleport, start");
+            line(sender, "/ww quicklaunch new [blocks] [filters]", "wipe this arena, set up a fresh one far away, start");
+            line(sender, "/ww reset [all]", "clear points, spawns and scores (all: also teams and resistance)");
+            line(sender, "/ww resistance <color> <0-4>", "handicap: resistance for a team, reapplied on respawn");
             line(sender, "/ww point add|remove <n>|list|clear|tp <n>|auto [count] [spread]", "control points");
             line(sender, "/ww point find [high|low] [biome:<id>] [structure:<id>] [range:<n>]", "add a point somewhere specific");
             line(sender, "/ww spawn set [color]|clear [color]|list|auto [radius]", "team spawns");
@@ -207,21 +245,21 @@ public class WoolWarsCommand implements TabExecutor {
                     return;
                 }
                 Msg.info(sender, "Searching...");
-                PointFinder.Result result = plugin.pointFinder().find(origin, query);
-                if (result.error() != null) {
-                    Msg.error(sender, result.error());
-                    return;
-                }
-                Block ground = result.ground();
-                ground.getRelative(0, 1, 0).setType(org.bukkit.Material.AIR);
-                String error = game().addPoint(ground);
-                if (error != null) {
-                    Msg.error(sender, error);
-                    return;
-                }
-                int n = game().points().size();
-                Msg.ok(sender, "Added point #" + n + " at " + ground.getX() + ", " + (ground.getY() + 1) + ", " + ground.getZ()
-                        + " (" + result.description() + "). /ww point tp " + n + " to go look.");
+                setupTask(sender, () -> plugin.pointFinder().find(origin, query).thenAccept(result -> {
+                    if (result.error() != null) {
+                        Msg.error(sender, result.error());
+                        return;
+                    }
+                    Block ground = result.ground();
+                    if (!plugin.placement().placePoint(ground)) {
+                        Msg.error(sender, "Couldn't place a point there.");
+                        return;
+                    }
+                    int n = game().points().size();
+                    int away = (int) Math.hypot(ground.getX() - origin.getX(), ground.getZ() - origin.getZ());
+                    Msg.ok(sender, "Added point #" + n + " at " + ground.getX() + ", " + (ground.getY() + 1) + ", " + ground.getZ()
+                            + " (" + result.description() + ", " + away + " blocks away). /ww point tp " + n + " to go look.");
+                }));
             }
             case "tp" -> {
                 Player player = requirePlayer(sender);
@@ -253,9 +291,10 @@ public class WoolWarsCommand implements TabExecutor {
                     Msg.error(sender, "Count must be between 1 and 16.");
                     return;
                 }
-                int placed = plugin.placement().autoPoints(player.getLocation(), count, spread);
-                Msg.ok(sender, "Placed " + placed + "/" + count + " control point" + (count == 1 ? "" : "s") + ".");
-                listPoints(sender);
+                setupTask(sender, () -> plugin.placement().autoPoints(player.getLocation(), count, spread).thenAccept(placed -> {
+                    Msg.ok(sender, "Placed " + placed + "/" + count + " control point" + (count == 1 ? "" : "s") + ".");
+                    listPoints(sender);
+                }));
             }
             default -> listPoints(sender);
         }
@@ -318,7 +357,7 @@ public class WoolWarsCommand implements TabExecutor {
                     return;
                 }
                 double radius = args.length > 1 ? parseInt(args[1], 100) : plugin.placement().defaultSpawnRadius();
-                autoSpawns(sender, teams, radius, fallback);
+                setupTask(sender, () -> autoSpawns(sender, teams, radius, fallback));
             }
             default -> {
                 for (Map.Entry<TeamColor, Location> entry : game().spawns().entrySet()) {
@@ -334,34 +373,162 @@ public class WoolWarsCommand implements TabExecutor {
         }
     }
 
-    private void autoSpawns(CommandSender sender, List<TeamColor> teams, double radius, Location fallback) {
-        List<TeamColor> failed = plugin.placement().autoSpawns(teams, radius, fallback);
-        Msg.ok(sender, "Placed spawns for " + (teams.size() - failed.size()) + " team(s), " + (int) radius + " blocks out.");
-        for (TeamColor team : failed) {
-            Msg.error(sender, "Couldn't find safe ground for " + team.displayName() + "; set it with /ww spawn set " + team.id());
-        }
+    private CompletableFuture<Void> autoSpawns(CommandSender sender, List<TeamColor> teams, double radius, Location fallback) {
+        Msg.info(sender, "Placing spawns " + (int) radius + " blocks out...");
+        return plugin.placement().autoSpawns(teams, radius, fallback).thenAccept(failed -> {
+            Msg.ok(sender, "Placed spawns for " + (teams.size() - failed.size()) + " team(s), " + (int) radius + " blocks out.");
+            for (TeamColor team : failed) {
+                Msg.error(sender, "Couldn't find safe ground for " + team.displayName() + "; set it with /ww spawn set " + team.id());
+            }
+        });
     }
 
-    private void quicklaunch(CommandSender sender) {
+    private void quicklaunch(CommandSender sender, String[] args) {
         Player player = sender instanceof Player p ? p : null;
-        if (game().points().isEmpty()) {
-            if (player == null) {
-                Msg.error(sender, "No control points; run this in-game or add one first.");
-                return;
-            }
-            plugin.placement().autoPoints(player.getLocation(), 1, 0);
-            Msg.ok(sender, "Placed a control point at your location.");
+        boolean fresh = args.length > 0 && args[0].equalsIgnoreCase("new");
+        if (!fresh && game().points().isEmpty() && player == null) {
+            Msg.error(sender, "No control points; run this in-game or add one first.");
+            return;
         }
-        List<TeamColor> teams = plugin.teams().activeTeams();
-        if (teams.isEmpty()) {
+        if (plugin.teams().activeTeams().isEmpty()) {
             Msg.error(sender, "No one is on a team yet. /ww join <color>");
             return;
         }
-        boolean missingSpawn = teams.stream().anyMatch(t -> game().spawnLocation(t) == null);
-        if (missingSpawn) {
-            autoSpawns(sender, teams, plugin.placement().defaultSpawnRadius(), player == null ? null : player.getLocation());
+        setupTask(sender, () -> {
+            CompletableFuture<Boolean> arena;
+            if (fresh && game().state() != Game.State.IDLE) {
+                // A new round replaces whatever is going on now.
+                game().stop();
+            }
+            if (fresh) {
+                arena = newArena(sender, Arrays.copyOfRange(args, 1, args.length));
+            } else if (game().points().isEmpty()) {
+                arena = plugin.placement().autoPoints(player.getLocation(), 1, 0).thenApply(placed -> {
+                    if (placed == 0) {
+                        Msg.error(sender, "Couldn't find ground for a control point here.");
+                        return false;
+                    }
+                    Msg.ok(sender, "Placed a control point at your location.");
+                    return true;
+                });
+            } else {
+                arena = CompletableFuture.completedFuture(true);
+            }
+            return arena.thenCompose(ok -> {
+                if (!ok) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                List<TeamColor> teams = plugin.teams().activeTeams();
+                boolean missingSpawn = teams.stream().anyMatch(t -> game().spawnLocation(t) == null);
+                CompletableFuture<Void> spawns = missingSpawn
+                        ? autoSpawns(sender, teams, plugin.placement().defaultSpawnRadius(), player == null ? null : player.getLocation())
+                        : CompletableFuture.completedFuture(null);
+                return spawns.thenRun(() -> game().beginCountdown());
+            });
+        });
+    }
+
+    /**
+     * /ww quicklaunch new [blocks] [find filters]: wipes the current arena and sets up a fresh one about
+     * {@code blocks} away in a random direction, so the new round can't overlap the old one.
+     * Completes with whether a new control point was placed.
+     */
+    private CompletableFuture<Boolean> newArena(CommandSender sender, String[] args) {
+        Location origin = sender instanceof Player p ? p.getLocation() : Bukkit.getWorlds().get(0).getSpawnLocation();
+        double parsed = args.length > 0 ? parseDouble(args[0], -1) : -1;
+        double distance = parsed > 0 ? parsed : plugin.placement().defaultNewArenaDistance();
+        String[] filters = parsed > 0 ? Arrays.copyOfRange(args, 1, args.length) : args;
+        List<String> errors = new ArrayList<>();
+        PointFinder.Query query = filters.length == 0 ? null : plugin.pointFinder().parse(filters, errors);
+        if (filters.length > 0 && query == null) {
+            errors.forEach(e -> Msg.error(sender, e));
+            return CompletableFuture.completedFuture(false);
         }
-        game().beginCountdown();
+
+        Msg.info(sender, "Finding a new arena about " + (int) distance + " blocks away...");
+        return plugin.placement().pickNewArena(origin, distance).thenCompose(center -> {
+            if (center == null) {
+                Msg.error(sender, "Couldn't find dry land " + (int) distance + " blocks away in any direction. Try another distance.");
+                return CompletableFuture.completedFuture(null);
+            }
+            if (query == null) {
+                return CompletableFuture.completedFuture(new PointFinder.Result(center, "", null));
+            }
+            return plugin.pointFinder().find(center.getLocation(), query);
+        }).thenApply(result -> {
+            if (result == null) {
+                return false;
+            }
+            if (result.error() != null) {
+                Msg.error(sender, result.error());
+                return false;
+            }
+            game().reset(false);
+            Block ground = result.ground();
+            if (!plugin.placement().placePoint(ground)) {
+                Msg.error(sender, "Couldn't place the control point.");
+                return false;
+            }
+            int away = (int) Math.hypot(ground.getX() - origin.getX(), ground.getZ() - origin.getZ());
+            String what = result.description().isEmpty() ? "" : " (" + result.description() + ")";
+            Msg.broadcast(Component.text("New arena: control point at " + ground.getX() + ", " + (ground.getY() + 1) + ", "
+                    + ground.getZ() + what + ", " + away + " blocks away.", NamedTextColor.AQUA));
+            return true;
+        });
+    }
+
+    private void reset(CommandSender sender, String[] args) {
+        boolean everything = args.length > 0 && args[0].equalsIgnoreCase("all");
+        game().reset(everything);
+        if (everything) {
+            plugin.teams().clearAll();
+        }
+        Msg.broadcast(Component.text(everything
+                ? "Everything reset: control points, spawns, scores, teams and team resistance."
+                : "Arena reset: control points, spawns and scores cleared. Teams kept.", NamedTextColor.RED));
+    }
+
+    private void resistance(CommandSender sender, String[] args) {
+        if (args.length == 0) {
+            boolean any = false;
+            for (TeamColor team : TeamColor.values()) {
+                if (game().resistance(team) > 0) {
+                    any = true;
+                    sender.sendMessage(Component.text("  ").append(team.label())
+                            .append(Component.text(": Resistance " + roman(game().resistance(team)), NamedTextColor.WHITE)));
+                }
+            }
+            if (!any) {
+                Msg.info(sender, "No team has resistance. /ww resistance <color> <0-4>");
+            }
+            return;
+        }
+        TeamColor team = TeamColor.fromId(args[0]);
+        int level = args.length > 1 ? parseInt(args[1], -1) : -1;
+        if (team == null || level < 0 || level > 4) {
+            Msg.error(sender, "/ww resistance <color> <0-4>  (0 removes it; each level is 20% less damage)");
+            return;
+        }
+        game().setResistance(team, level);
+        if (level == 0) {
+            for (Player p : plugin.teams().onlineMembers(team)) {
+                p.removePotionEffect(org.bukkit.potion.PotionEffectType.RESISTANCE);
+            }
+            Msg.broadcast(Component.empty().append(team.label()).append(Component.text(" no longer has resistance.")));
+        } else {
+            Msg.broadcast(Component.empty().append(team.label()).append(Component.text(" now has Resistance " + roman(level)
+                    + " (" + level * 20 + "% less damage).")));
+        }
+    }
+
+    private static String roman(int n) {
+        return switch (n) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            default -> String.valueOf(n);
+        };
     }
 
     private void timer(CommandSender sender, String[] args) {
@@ -545,6 +712,9 @@ public class WoolWarsCommand implements TabExecutor {
                 case "point" -> options.addAll(admin ? List.of("add", "find", "remove", "list", "clear", "tp", "auto") : List.of());
                 case "spawn" -> options.addAll(admin ? List.of("set", "clear", "list", "auto") : List.of());
                 case "win" -> options.addAll(List.of("points", "time", "off"));
+                case "quicklaunch", "ql" -> options.add("new");
+                case "reset" -> options.add("all");
+                case "resistance" -> options.addAll(colorIds());
                 case "timer" -> options.addAll(List.of("reset", "10", "5"));
                 case "scores" -> options.add("reset");
                 case "team" -> Bukkit.getOnlinePlayers().forEach(p -> options.add(p.getName()));
@@ -554,11 +724,19 @@ public class WoolWarsCommand implements TabExecutor {
             }
         } else if (args.length >= 3 && args[0].equalsIgnoreCase("point") && args[1].equalsIgnoreCase("find") && admin) {
             options.addAll(plugin.pointFinder().suggestions());
+        } else if (args.length >= 3 && (args[0].equalsIgnoreCase("quicklaunch") || args[0].equalsIgnoreCase("ql"))
+                && args[1].equalsIgnoreCase("new") && admin) {
+            if (args.length == 3) {
+                options.addAll(List.of("1000", "2000", "3000"));
+            }
+            options.addAll(plugin.pointFinder().suggestions());
         }
         if (args.length == 3) {
             String sub = args[0].toLowerCase(Locale.ROOT);
             String action = args[1].toLowerCase(Locale.ROOT);
-            if (sub.equals("team")) {
+            if (sub.equals("resistance")) {
+                options.addAll(List.of("0", "1", "2", "3", "4"));
+            } else if (sub.equals("team")) {
                 options.addAll(colorIds());
                 options.add("none");
             } else if (sub.equals("spawn") && (action.equals("set") || action.equals("clear"))) {

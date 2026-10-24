@@ -89,6 +89,7 @@ public class GameListener implements Listener {
         if (spawn != null) {
             event.setRespawnLocation(spawn);
         }
+        plugin.getServer().getScheduler().runTask(plugin, () -> plugin.supplies().applyTeamResistance(event.getPlayer()));
         if (event.getRespawnLocation().getWorld().getEnvironment() == World.Environment.NETHER) {
             plugin.getServer().getScheduler().runTask(plugin, () ->
                     event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 200, 0)));

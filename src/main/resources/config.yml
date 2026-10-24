@@ -27,6 +27,9 @@ supply:
 # auto = on whenever a control point is in the Nether. Also accepts on / off.
 nether-gear: auto
 
+# Empty team players' inventories when a game starts (including via quicklaunch).
+clear-inventory-on-start: true
+
 # Fraction of each item stack dropped on death (0 = full keep inventory). Supplied items never drop.
 death-drop-fraction: 0.0
 
@@ -47,6 +50,8 @@ auto:
   spawn-travel-fraction: 0.25
   # Blocks per second over real terrain (sprinting on flat ground is ~5.6).
   run-speed: 4.0
+  # How far /ww quicklaunch new moves to set up a fresh arena, in blocks, or "auto" (3x the spawn radius, at least 1000).
+  new-arena-distance: auto
 
 # /ww point find
 find:

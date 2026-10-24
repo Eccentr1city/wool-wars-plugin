@@ -45,6 +45,8 @@ public class Game {
     private final List<ControlPoint> points = new ArrayList<>();
     private final Map<TeamColor, Location> spawns = new EnumMap<>(TeamColor.class);
     private final Map<TeamColor, Integer> scores = new EnumMap<>(TeamColor.class);
+    /** Resistance level (1-4) per team, for balancing uneven teams. */
+    private final Map<TeamColor, Integer> resistance = new EnumMap<>(TeamColor.class);
 
     private State state = State.IDLE;
     private int activeIndex;
@@ -238,6 +240,9 @@ public class Game {
         elapsedTicks = 0;
         state = State.RUNNING;
         dirty = true;
+        if (plugin.getConfig().getBoolean("clear-inventory-on-start", true)) {
+            plugin.supplies().clearInventories();
+        }
         plugin.supplies().giveStartGear();
 
         Msg.titleAll(Component.text("Wool Wars", NamedTextColor.GOLD, TextDecoration.BOLD),
@@ -296,6 +301,24 @@ public class Game {
         broadcastStandings();
     }
 
+    /**
+     * Wipes the arena for a new round: stops the game, removes every control point (restoring the blocks
+     * under them), clears team spawns and scores. Teams and team resistance stay unless {@code everything}.
+     */
+    public void reset(boolean everything) {
+        state = State.IDLE;
+        clearPoints();
+        spawns.clear();
+        scores.clear();
+        activeIndex = 0;
+        ticksLeft = intervalTicks();
+        elapsedTicks = 0;
+        if (everything) {
+            resistance.clear();
+        }
+        dirty = true;
+    }
+
     public void resetScores() {
         scores.clear();
         dirty = true;
@@ -313,7 +336,8 @@ public class Game {
             if (spawn == null) {
                 continue;
             }
-            player.teleport(spawn);
+            // Async so loading the spawn chunk from disk doesn't stall the server.
+            player.teleportAsync(spawn);
             var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
             player.setHealth(maxHealth == null ? 20 : maxHealth.getValue());
             player.setFoodLevel(20);
@@ -422,6 +446,19 @@ public class Game {
         return spawn == null || spawn.getWorld() == null ? null : spawn.clone();
     }
 
+    public int resistance(TeamColor team) {
+        return resistance.getOrDefault(team, 0);
+    }
+
+    public void setResistance(TeamColor team, int level) {
+        if (level <= 0) {
+            resistance.remove(team);
+        } else {
+            resistance.put(team, level);
+        }
+        dirty = true;
+    }
+
     public Map<TeamColor, Location> spawns() {
         return spawns;
     }
@@ -499,6 +536,9 @@ public class Game {
         for (Map.Entry<TeamColor, Integer> entry : scores.entrySet()) {
             data.set("scores." + entry.getKey().id(), entry.getValue());
         }
+        for (Map.Entry<TeamColor, Integer> entry : resistance.entrySet()) {
+            data.set("resistance." + entry.getKey().id(), entry.getValue());
+        }
         // A countdown in progress is saved as idle; a running game comes back paused.
         data.set("state", state == State.COUNTDOWN ? State.IDLE.name() : state.name());
         data.set("active-index", activeIndex);
@@ -542,6 +582,15 @@ public class Game {
                 }
                 spawns.put(color, new Location(world, spawnSection.getDouble(key + ".x"), spawnSection.getDouble(key + ".y"),
                         spawnSection.getDouble(key + ".z"), (float) spawnSection.getDouble(key + ".yaw"), 0));
+            }
+        }
+        ConfigurationSection resistanceSection = data.getConfigurationSection("resistance");
+        if (resistanceSection != null) {
+            for (String key : resistanceSection.getKeys(false)) {
+                TeamColor color = TeamColor.fromId(key);
+                if (color != null) {
+                    resistance.put(color, resistanceSection.getInt(key));
+                }
             }
         }
         ConfigurationSection scoreSection = data.getConfigurationSection("scores");

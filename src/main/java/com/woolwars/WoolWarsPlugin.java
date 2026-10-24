@@ -69,6 +69,7 @@ public class WoolWarsPlugin extends JavaPlugin {
         if (tickCount % 10 == 0) {
             supplies.dedupeAll();
             supplies.applyMiningFatigue();
+            supplies.applyTeamResistance();
             hud.update();
         }
         if (tickCount % 20 == 0) {

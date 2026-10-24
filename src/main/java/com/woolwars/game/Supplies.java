@@ -94,6 +94,33 @@ public class Supplies {
         }
     }
 
+    /** Empties team players' inventories (armor and offhand too) so everyone starts a game even. */
+    public void clearInventories() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (plugin.teams().teamOf(player) != null) {
+                // Closing first returns crafting-grid items to the inventory, so they get cleared too.
+                player.closeInventory();
+                player.getInventory().clear();
+                player.setItemOnCursor(null);
+            }
+        }
+    }
+
+    /** Keeps each team's balancing resistance topped up; also covers players who just respawned. */
+    public void applyTeamResistance() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            applyTeamResistance(player);
+        }
+    }
+
+    public void applyTeamResistance(Player player) {
+        TeamColor team = plugin.teams().teamOf(player);
+        int level = team == null ? 0 : plugin.game().resistance(team);
+        if (level > 0 && !player.isDead()) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, level - 1, true, false, true));
+        }
+    }
+
     public void applyMiningFatigue() {
         if (!plugin.getConfig().getBoolean("mining-fatigue.enabled", false)) {
             return;

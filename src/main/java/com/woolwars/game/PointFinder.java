@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 import com.woolwars.WoolWarsPlugin;
@@ -100,7 +101,11 @@ public class PointFinder {
         return new Query(height, biome, structures, structureName, range);
     }
 
-    public Result find(Location origin, Query query) {
+    /**
+     * Finds a spot for the query around {@code origin}. Locating a biome or structure happens right away; the
+     * terrain to search is then loaded in the background, and the future completes on the main thread.
+     */
+    public CompletableFuture<Result> find(Location origin, Query query) {
         World world = origin.getWorld();
         int locateBlocks = plugin.getConfig().getInt("find.locate-radius", 3000);
 
@@ -110,12 +115,13 @@ public class PointFinder {
 
         Location center = origin;
         Predicate<Block> biomeMatch = b -> true;
-        String where = "near you";
+        String where = "nearby";
         int range = query.range();
         if (query.biome() != null) {
             BiomeSearchResult found = world.locateNearestBiome(origin, locateBlocks, 32, 64, query.biome());
             if (found == null) {
-                return Result.fail("No " + name(biomeRegistry().getKey(query.biome())) + " within " + locateBlocks + " blocks.");
+                return CompletableFuture.completedFuture(
+                        Result.fail("No " + name(biomeRegistry().getKey(query.biome())) + " within " + locateBlocks + " blocks."));
             }
             center = found.getLocation();
             Biome target = query.biome();
@@ -124,6 +130,15 @@ public class PointFinder {
             range = Math.min(range, 48);
         }
 
+        Location c = center;
+        Predicate<Block> match = biomeMatch;
+        String place = where;
+        int r = range;
+        return plugin.placement().withArea(world, c.getBlockX(), c.getBlockZ(), r,
+                () -> searchArea(world, c, query, r, match, place));
+    }
+
+    private Result searchArea(World world, Location center, Query query, int range, Predicate<Block> biomeMatch, String where) {
         Scan mode = query.height() == Height.LOW ? Scan.CAVE : Scan.SURFACE;
         List<Block> floors = scan(world, center.getBlockX(), center.getBlockZ(), range, mode,
                 world.getMinHeight(), world.getMaxHeight() - 1, biomeMatch);
@@ -152,7 +167,7 @@ public class PointFinder {
         return new Result(pick, what, null);
     }
 
-    private Result findInStructure(Location origin, Query query, int locateBlocks) {
+    private CompletableFuture<Result> findInStructure(Location origin, Query query, int locateBlocks) {
         World world = origin.getWorld();
         StructureSearchResult nearest = null;
         double best = Double.MAX_VALUE;
@@ -164,8 +179,8 @@ public class PointFinder {
             }
         }
         if (nearest == null) {
-            return Result.fail("No " + query.structureName() + " within " + locateBlocks + " blocks"
-                    + (world.getEnvironment() == World.Environment.NORMAL ? "" : " in the " + world.getEnvironment().name().toLowerCase(Locale.ROOT)) + ".");
+            return CompletableFuture.completedFuture(Result.fail("No " + query.structureName() + " within " + locateBlocks + " blocks"
+                    + (world.getEnvironment() == World.Environment.NORMAL ? "" : " in the " + world.getEnvironment().name().toLowerCase(Locale.ROOT)) + "."));
         }
         Location at = nearest.getLocation();
         BoundingBox box = null;
@@ -174,15 +189,23 @@ public class PointFinder {
         }
         String label = name(structureRegistry().getKey(nearest.getStructure()));
         if (box == null) {
-            return Result.fail("Found " + article(label) + " " + label + " at " + at.getBlockX() + ", " + at.getBlockZ() + " but couldn't read its layout.");
+            return CompletableFuture.completedFuture(Result.fail("Found " + article(label) + " " + label + " at "
+                    + at.getBlockX() + ", " + at.getBlockZ() + " but couldn't read its layout."));
         }
         for (ControlPoint point : plugin.game().points()) {
             if (world.equals(point.world()) && box.clone().expand(MIN_POINT_GAP).contains(point.x(), point.y(), point.z())) {
-                return Result.fail("The nearest " + label + " already has a control point. Move further away and search again.");
+                return CompletableFuture.completedFuture(
+                        Result.fail("The nearest " + label + " already has a control point. Move further away and search again."));
             }
         }
         BoundingBox inside = box;
         int radius = (int) Math.ceil(Math.max(box.getWidthX(), box.getWidthZ()) / 2);
+        return plugin.placement().withArea(world, (int) box.getCenterX(), (int) box.getCenterZ(), radius,
+                () -> searchStructure(world, inside, radius, query, label));
+    }
+
+    private Result searchStructure(World world, BoundingBox box, int radius, Query query, String label) {
+        BoundingBox inside = box;
         List<Block> floors = scan(world, (int) box.getCenterX(), (int) box.getCenterZ(), radius, Scan.ALL,
                 (int) box.getMinY(), (int) box.getMaxY(), b -> inside.contains(b.getX() + 0.5, b.getY() + 1.5, b.getZ() + 0.5));
         if (floors.isEmpty()) {
@@ -193,8 +216,7 @@ public class PointFinder {
             case LOW -> floors.stream().min(Comparator.comparingInt(Block::getY)).get();
             case ANY -> closest(floors, box.getCenter());
         };
-        int distance = (int) Math.sqrt(best);
-        return new Result(pick, "inside " + article(label) + " " + label + ", " + distance + " blocks away", null);
+        return new Result(pick, "inside " + article(label) + " " + label, null);
     }
 
     /** Which floors of each column to collect. */
